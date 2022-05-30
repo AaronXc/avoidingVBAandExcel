@@ -133,7 +133,8 @@ namespace MotorsAndBatteries.controllers
                     break;
             }
 
-            Dictionary<string, DataTable> dtd = new Dictionary<string, DataTable>();
+            //Dictionary<string, DataTable> dtd = new Dictionary<string, DataTable>();
+            DataSet ExcelSheet = new DataSet("estimating");
             //Dictionary<string, DataColumnCollection> dtd = new Dictionary<string, DataColumnCollection>();
             conString = string.Format(conString, filePath);
 
@@ -151,32 +152,70 @@ namespace MotorsAndBatteries.controllers
                         dtExcelSchema = connExcel.GetOleDbSchemaTable(OleDbSchemaGuid.Tables, null);
                         String[] excelSheets = new String[dtExcelSchema.Rows.Count];
                         int i = 0;
-
+                        #region ListOfDataTables
                         // Add the sheet name to the string array.
                         foreach (DataRow row in dtExcelSchema.Rows)
                         {
                             excelSheets[i] = row["TABLE_NAME"].ToString();
+
                             i++;
                         }
+                        #endregion
                         connExcel.Close();
-                        // Loop through all of the sheets if you want too...
+                        
                         for (int j = 0; j < excelSheets.Length; j++)
                         {
-                            var dt = new DataTable();
                             // Query each excel sheet.
                             connExcel.Open();
                             cmdExcel.CommandText = "SELECT * From [" + excelSheets[j] + "]";
                             odaExcel.SelectCommand = cmdExcel;
-                            odaExcel.Fill(dt);
+                            odaExcel.Fill(ExcelSheet, excelSheets[j]);
                             connExcel.Close();
-
-                            dtd.Add(excelSheets[j], dt);
                         }
-                        
-
 
                     }
                 }
+
+                var tc = new TableCreator();
+                DataTable dt = tc.createTable(ExcelSheet);
+                connExcel.Open();
+                foreach (DataRow row in dt.Rows)
+                {
+                    using (OleDbCommand cmd = new OleDbCommand())
+                    {
+                        using (OleDbDataAdapter odaExcel = new OleDbDataAdapter())
+                        {
+                            cmd.Connection = connExcel;
+                            cmd.CommandText = "Insert INTO [parallel_batteries$] (" +
+                            "[motor], [battery], [battery source], [parallel batteries], [hover mass (g)], [battery mass (g)], [motor mass (g)], [remaining payload (g)], " +
+                            "[battery capacity], [number of cells], [battery energy surplus], [battery life surplus]) " +
+                            "VALUES (@motor, @battery, @batterySource, @paraBat, @hMass, @bMass, @mMass, @RP, @batteryCap, @numCells, @batEnerSurplus, @batLifeSurplus)";
+                            cmd.Parameters.AddWithValue("@motor", row["motor"]);
+                            cmd.Parameters.AddWithValue("@battery", row["battery"]);
+                            cmd.Parameters.AddWithValue("@batterySource", row["battery source"]);
+                            cmd.Parameters.AddWithValue("@paraBat", row["parallel batteries"]);
+                            cmd.Parameters.AddWithValue("@hMass", row["hover mass (g)"]);
+                            cmd.Parameters.AddWithValue("@bMass", row["battery mass (g)"]);
+                            cmd.Parameters.AddWithValue("@mMass", row["motor mass (g)"]);
+                            cmd.Parameters.AddWithValue("@RP", row["remaining payload (g)"]);
+                            cmd.Parameters.AddWithValue("@batteryCap", row["battery capacity"]);
+                            cmd.Parameters.AddWithValue("@numCells", row["number of cells"]);
+                            cmd.Parameters.AddWithValue("@batEnerSurplus", row["battery energy surplus"]);
+                            cmd.Parameters.AddWithValue("@batLifeSurplus", row["battery life surplus"]);
+
+                            cmd.ExecuteNonQuery();
+                            //odaExcel.InsertCommand = cmd;
+                            ////olbligatory update and delete commands. these can be changed in the case of actually wanting to delete or update the table
+                            //cmd.CommandText = "UPDATE [parallel_batteries$] set [motor] = [motor] WHERE false";
+                            //odaExcel.UpdateCommand = cmd;
+                            //cmd.CommandText = "DELETE FROM [parallel_batteries$] WHERE false";
+                            //odaExcel.DeleteCommand = cmd;
+                            //odaExcel.Update(ExcelSheet.Tables["parallel_batteries$"]);
+                        }
+
+                    }
+                }
+                connExcel.Close();
             }
 
             //using (ComponentContext ctx = new ComponentContext(configuration))
@@ -213,7 +252,7 @@ namespace MotorsAndBatteries.controllers
 
             //JsonConvert.SerializeObject(dtd);
 
-            return new JsonResult(dtd);
+            return this.Ok();
         }
 
     }
