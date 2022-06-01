@@ -176,10 +176,9 @@ namespace MotorsAndBatteries.controllers
                     }
                 }
 
-                var tc = new TableCreator();
-                DataTable dt = tc.createTable(ExcelSheet);
+                Dictionary<string, DataTable> dt = TableCreator.createTable(ExcelSheet);
                 connExcel.Open();
-                foreach (DataRow row in dt.Rows)
+                foreach (DataRow row in dt["parallel_batteries$"].Rows)
                 {
                     using (OleDbCommand cmd = new OleDbCommand())
                     {
@@ -202,20 +201,26 @@ namespace MotorsAndBatteries.controllers
                             cmd.Parameters.AddWithValue("@numCells", row["number of cells"]);
                             cmd.Parameters.AddWithValue("@batEnerSurplus", row["battery energy surplus"]);
                             cmd.Parameters.AddWithValue("@batLifeSurplus", row["battery life surplus"]);
+                            
+                            odaExcel.InsertCommand = cmd;
+                            //obligatory update and delete commands. these can be changed in the case of actually wanting to delete or update the table
+                            cmd.CommandText = "UPDATE [parallel_batteries$] set [motor] = [motor] WHERE false";
+                            odaExcel.UpdateCommand = cmd;
+                            cmd.CommandText = "DELETE FROM [parallel_batteries$] WHERE false";
+                            odaExcel.DeleteCommand = cmd;
+                            cmd.CommandText = "Select * From [parallel_batteries$]";
+                            odaExcel.SelectCommand = cmd;
 
-                            cmd.ExecuteNonQuery();
-                            //odaExcel.InsertCommand = cmd;
-                            ////olbligatory update and delete commands. these can be changed in the case of actually wanting to delete or update the table
-                            //cmd.CommandText = "UPDATE [parallel_batteries$] set [motor] = [motor] WHERE false";
-                            //odaExcel.UpdateCommand = cmd;
-                            //cmd.CommandText = "DELETE FROM [parallel_batteries$] WHERE false";
-                            //odaExcel.DeleteCommand = cmd;
-                            //odaExcel.Update(ExcelSheet.Tables["parallel_batteries$"]);
+                            odaExcel.Fill(ExcelSheet);
+                            odaExcel.Update(ExcelSheet.Tables["parallel_batteries$"]);
+
+                            // repeat the above for the series batteries option
                         }
 
                     }
                 }
                 connExcel.Close();
+
             }
 
             //using (ComponentContext ctx = new ComponentContext(configuration))
